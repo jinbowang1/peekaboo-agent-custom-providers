@@ -347,7 +347,8 @@ extension AgentCommand {
                     .lowercased()
                 return provider == "ollama" || provider == "lmstudio" || provider == "lm-studio"
             }
-        return hasOpenAI || hasAnthropic || hasGemini || hasMiniMax || hasLocalProvider
+        let hasCustomProvider = configuration.listCustomProviders().values.contains { $0.enabled }
+        return hasOpenAI || hasAnthropic || hasGemini || hasMiniMax || hasLocalProvider || hasCustomProvider
     }
 
     func emitAgentUnavailableMessage() {
