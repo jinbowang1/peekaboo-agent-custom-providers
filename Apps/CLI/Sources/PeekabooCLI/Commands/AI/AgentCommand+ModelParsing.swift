@@ -41,12 +41,37 @@ extension AgentCommand {
 
     func validatedModelSelection() throws -> LanguageModel? {
         guard let modelString = self.model else { return nil }
+
+        // Custom provider "providerId/model" lookup precedes built-in parsing so user-configured
+        // providers (e.g. OpenRouter, AWS Bedrock via LiteLLM) shadow stray name collisions.
+        if let customModel = self.resolveCustomProviderModel(modelString) {
+            return customModel
+        }
+
         guard let parsed = self.parseModelString(modelString) else {
             throw PeekabooError.invalidInput(
                 "Unsupported model '\(modelString)'. Allowed values: \(Self.allowedModelList)"
             )
         }
         return parsed
+    }
+
+    private func resolveCustomProviderModel(_ modelString: String) -> LanguageModel? {
+        let trimmed = modelString.trimmingCharacters(in: .whitespacesAndNewlines)
+        let parts = trimmed.split(separator: "/", maxSplits: 1)
+        guard parts.count == 2 else { return nil }
+
+        let providerID = String(parts[0])
+        let resolvedModelString = String(parts[1])
+
+        guard let customModel = PeekabooCustomProviderFactory.makeModel(
+            providerID: providerID,
+            modelString: resolvedModelString,
+            configuration: self.services.configuration)
+        else {
+            return nil
+        }
+        return .custom(provider: customModel)
     }
 
     private static let supportedOpenAIInputs: Set<LanguageModel.OpenAI> = [
@@ -107,6 +132,9 @@ extension AgentCommand {
             return configuration.getGeminiAPIKey()?.isEmpty == false
         case .minimax:
             return configuration.getMiniMaxAPIKey()?.isEmpty == false
+        case .custom, .openaiCompatible, .anthropicCompatible:
+            // Credentials live in the per-provider config or are already captured by the factory.
+            return true
         default:
             return false
         }
@@ -126,6 +154,12 @@ extension AgentCommand {
             "Ollama"
         case .lmstudio:
             "LM Studio"
+        case let .custom(provider):
+            (provider as? PeekabooCustomProviderModel)?.providerID ?? "custom"
+        case .openaiCompatible:
+            "openai-compatible"
+        case .anthropicCompatible:
+            "anthropic-compatible"
         default:
             "the selected provider"
         }
@@ -145,6 +179,8 @@ extension AgentCommand {
             "OLLAMA_BASE_URL or PEEKABOO_OLLAMA_BASE_URL"
         case .lmstudio:
             "LM Studio local server URL"
+        case .custom, .openaiCompatible, .anthropicCompatible:
+            "custom provider configuration (peekaboo config add-provider)"
         default:
             "provider API key"
         }

@@ -26,8 +26,9 @@ extension PeekabooServices {
         let hasOllama = Self.providerList(providers, containsToolCapableLocalProvider: "ollama")
         let hasLMStudio = Self.providerList(providers, containsToolCapableLocalProvider: "lmstudio") ||
             Self.providerList(providers, containsToolCapableLocalProvider: "lm-studio")
+        let hasCustomProvider = self.configuration.listCustomProviders().values.contains { $0.enabled }
 
-        if hasOpenAI || hasAnthropic || hasGemini || hasMiniMax || hasOllama || hasLMStudio {
+        if hasOpenAI || hasAnthropic || hasGemini || hasMiniMax || hasOllama || hasLMStudio || hasCustomProvider {
             let agentConfig = self.configuration.getConfiguration()
             let environmentProviders = EnvironmentVariables.value(for: "PEEKABOO_AI_PROVIDERS")?
                 .trimmingCharacters(in: .whitespacesAndNewlines)
